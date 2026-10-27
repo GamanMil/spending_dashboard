@@ -23,18 +23,25 @@
 
       <section class="balance">
         <p class="label">Current balance</p>
-        <strong></strong>
-        <p class="change"></p>
+        <strong id="current-balance">£0.00</strong>
+        <p class="change" id="balance-change">Set your starting balance below.</p>
+        <form class="balance-form" id="balance-form">
+          <label for="balance-input">Starting balance</label>
+          <div class="balance-input-row">
+            <input id="balance-input" required type="number" min="0" step="0.01" placeholder="0.00" />
+            <button type="submit">Save</button>
+          </div>
+        </form>
       </section>
 
       <section class="numbers">
         <div>
           <p class="label">Income this month</p>
-          <strong></strong>
+          <strong id="income-total">£0.00</strong>
         </div>
         <div>
           <p class="label">Spent this month</p>
-          <strong></strong>
+          <strong id="spent-total">£0.00</strong>
         </div>
       </section>
 
