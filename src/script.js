@@ -6,6 +6,8 @@ const balanceInput = document.querySelector("#balance-input");
 const currentBalance = document.querySelector("#current-balance");
 const balanceChange = document.querySelector("#balance-change");
 const spentTotal = document.querySelector("#spent-total");
+const monthlySpendingTotal = document.querySelector("#monthly-spending-total");
+const monthlySpendingList = document.querySelector("#monthly-spending-list");
 const storageKey = "northstar-transactions";
 const balanceStorageKey = "northstar-starting-balance";
 
@@ -28,11 +30,15 @@ const getStartingBalance = () => {
   return Number.isFinite(storedBalance) && storedBalance >= 0 ? storedBalance : 0;
 };
 
+const addToStartingBalance = (amount) => {
+  saveStartingBalance(getStartingBalance() + amount);
+};
+
 const saveStartingBalance = (amount) => {
   localStorage.setItem(balanceStorageKey, String(amount));
 };
 
-const renderTransaction = ({ description, amount, createdAt }) => {
+const createTransactionRow = ({ description, amount, createdAt }) => {
   const row = document.createElement("div");
   row.className = "transaction";
   const mark = document.createElement("span");
@@ -47,19 +53,55 @@ const renderTransaction = ({ description, amount, createdAt }) => {
   const value = document.createElement("strong");
   value.textContent = `−${formatCurrency(amount)}`;
   row.append(mark, details, value);
-  list.prepend(row);
+  return row;
+};
+
+const renderTransaction = (transaction) => {
+  list.prepend(createTransactionRow(transaction));
+};
+
+const isCurrentMonth = (createdAt) => {
+  if (!createdAt) return false;
+  const date = new Date(createdAt);
+  const now = new Date();
+  return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
+};
+
+const renderMonthlySpending = (transactions) => {
+  const monthlyTransactions = transactions.filter(({ createdAt }) => isCurrentMonth(createdAt));
+  const monthlySpent = monthlyTransactions.reduce(
+    (total, transaction) => total + Number(transaction.amount || 0),
+    0,
+  );
+  monthlySpendingTotal.textContent = formatCurrency(monthlySpent);
+  monthlySpendingList.replaceChildren();
+
+  if (!monthlyTransactions.length) {
+    const emptyState = document.createElement("p");
+    emptyState.className = "monthly-spending-empty";
+    emptyState.textContent = "No spending recorded this month.";
+    monthlySpendingList.append(emptyState);
+    return monthlySpent;
+  }
+
+  monthlyTransactions
+    .slice()
+    .reverse()
+    .forEach((transaction) => monthlySpendingList.append(createTransactionRow(transaction)));
+  return monthlySpent;
 };
 
 const renderSummary = () => {
   const transactions = getTransactions();
   const spent = transactions.reduce((total, transaction) => total + Number(transaction.amount || 0), 0);
+  const monthlySpent = renderMonthlySpending(transactions);
   const startingBalance = getStartingBalance();
   const balance = startingBalance - spent;
   currentBalance.textContent = formatCurrency(balance);
-  spentTotal.textContent = formatCurrency(spent);
-  balanceChange.textContent = spent
-    ? `${formatCurrency(spent)} spent since your starting balance.`
-    : "No transactions recorded yet.";
+  spentTotal.textContent = formatCurrency(monthlySpent);
+  balanceChange.textContent = monthlySpent
+    ? `${formatCurrency(monthlySpent)} spent this month.`
+    : "No spending recorded this month.";
   balanceInput.value = startingBalance ? startingBalance.toFixed(2) : "";
 };
 
@@ -99,8 +141,9 @@ balanceForm.addEventListener("submit", (event) => {
   const amount = Number(balanceInput.value);
   if (!Number.isFinite(amount) || amount < 0) return;
 
-  saveStartingBalance(amount);
+  addToStartingBalance(amount);
   renderSummary();
+  balanceInput.value = "";
 });
 
 document.addEventListener("keydown", (event) => {
