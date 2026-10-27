@@ -65,6 +65,23 @@
             <h2>Transactions</h2>
           </div>
         </div>
+        <div class="transaction-controls">
+          <label>
+            <span class="sr-only">Filter transactions by type</span>
+            <select id="type-filter">
+              <option value="all">All types</option>
+            </select>
+          </label>
+          <label>
+            <span class="sr-only">Sort transactions</span>
+            <select id="transaction-sort">
+              <option value="recent">Most recent</option>
+              <option value="type">Type A–Z</option>
+              <option value="amount-high">Amount: high to low</option>
+              <option value="amount-low">Amount: low to high</option>
+            </select>
+          </label>
+        </div>
         <div id="transaction-list">
         </div>
       </section>
@@ -79,6 +96,17 @@
         <h2>Add a transaction</h2>
         <label>Description<input id="description" required /></label>
         <label>Amount<input id="amount" required type="number" min="0.01" step="0.01" /></label>
+        <label>Type
+          <select id="type" required>
+            <option value="Rent">Rent</option>
+            <option value="Shopping">Shopping</option>
+            <option value="Subscription">Subscription</option>
+            <option value="Food">Food</option>
+            <option value="Transport">Transport</option>
+            <option value="Utilities">Utilities</option>
+            <option value="Other">Other</option>
+          </select>
+        </label>
         <button class="add-button" type="submit">Save transaction</button>
       </form>
     </div>

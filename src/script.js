@@ -8,14 +8,25 @@ const balanceChange = document.querySelector("#balance-change");
 const spentTotal = document.querySelector("#spent-total");
 const monthlySpendingTotal = document.querySelector("#monthly-spending-total");
 const monthlySpendingList = document.querySelector("#monthly-spending-list");
+const typeFilter = document.querySelector("#type-filter");
+const transactionSort = document.querySelector("#transaction-sort");
+const typeInput = document.querySelector("#type");
 const storageKey = "northstar-transactions";
 const balanceStorageKey = "northstar-starting-balance";
+const transactionTypes = ["Rent", "Shopping", "Subscription", "Food", "Transport", "Utilities", "Other"];
+const typeColors = ["purple", "coral", "yellow", "green", "blue", "orange", "slate"];
 
 const formatCurrency = (amount) => `£${amount.toFixed(2)}`;
 
 const getTransactions = () => {
   try {
-    return JSON.parse(localStorage.getItem(storageKey) || "[]");
+    const transactions = JSON.parse(localStorage.getItem(storageKey) || "[]");
+    return Array.isArray(transactions)
+      ? transactions.map((transaction) => ({
+          ...transaction,
+          type: transactionTypes.includes(transaction.type) ? transaction.type : "Other",
+        }))
+      : [];
   } catch {
     return [];
   }
@@ -38,7 +49,7 @@ const saveStartingBalance = (amount) => {
   localStorage.setItem(balanceStorageKey, String(amount));
 };
 
-const createTransactionRow = ({ description, amount, createdAt }) => {
+const createTransactionRow = ({ description, amount, createdAt, type = "Other" }) => {
   const row = document.createElement("div");
   row.className = "transaction";
   const mark = document.createElement("span");
@@ -48,7 +59,7 @@ const createTransactionRow = ({ description, amount, createdAt }) => {
   const title = document.createElement("b");
   title.textContent = description;
   const date = document.createElement("small");
-  date.textContent = createdAt ? "Added locally" : "Just now";
+  date.textContent = `${type} · ${createdAt ? "Added locally" : "Just now"}`;
   details.append(title, date);
   const value = document.createElement("strong");
   value.textContent = `−${formatCurrency(amount)}`;
@@ -56,8 +67,32 @@ const createTransactionRow = ({ description, amount, createdAt }) => {
   return row;
 };
 
-const renderTransaction = (transaction) => {
-  list.prepend(createTransactionRow(transaction));
+const compareByDate = (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+
+const getSortedTransactions = (transactions) => {
+  const sort = transactionSort.value;
+  return transactions.slice().sort((a, b) => {
+    if (sort === "type") return a.type.localeCompare(b.type) || compareByDate(a, b);
+    if (sort === "amount-high") return Number(b.amount) - Number(a.amount) || compareByDate(a, b);
+    if (sort === "amount-low") return Number(a.amount) - Number(b.amount) || compareByDate(a, b);
+    return compareByDate(a, b);
+  });
+};
+
+const renderTransactions = () => {
+  const selectedType = typeFilter.value;
+  const transactions = getTransactions()
+    .filter((transaction) => selectedType === "all" || transaction.type === selectedType);
+  list.replaceChildren();
+  getSortedTransactions(transactions).forEach((transaction) => list.append(createTransactionRow(transaction)));
+};
+
+const updateTypeFilter = (transactions) => {
+  const selectedType = typeFilter.value;
+  const types = [...new Set(transactions.map(({ type }) => type))].sort();
+  typeFilter.replaceChildren(new Option("All types", "all"));
+  types.forEach((type) => typeFilter.append(new Option(type, type)));
+  typeFilter.value = types.includes(selectedType) ? selectedType : "all";
 };
 
 const isCurrentMonth = (createdAt) => {
@@ -69,11 +104,16 @@ const isCurrentMonth = (createdAt) => {
 
 const renderMonthlySpending = (transactions) => {
   const monthlyTransactions = transactions.filter(({ createdAt }) => isCurrentMonth(createdAt));
-  const monthlySpent = monthlyTransactions.reduce(
-    (total, transaction) => total + Number(transaction.amount || 0),
-    0,
-  );
+  const totalsByType = monthlyTransactions.reduce((totals, transaction) => {
+    totals[transaction.type] = (totals[transaction.type] || 0) + Number(transaction.amount || 0);
+    return totals;
+  }, {});
+  const monthlySpent = Object.values(totalsByType).reduce((total, amount) => total + amount, 0);
   monthlySpendingTotal.textContent = formatCurrency(monthlySpent);
+  const breakdown = document.querySelector(".spending-bar");
+  const legend = document.querySelector(".legend");
+  breakdown.replaceChildren();
+  legend.replaceChildren();
   monthlySpendingList.replaceChildren();
 
   if (!monthlyTransactions.length) {
@@ -84,9 +124,28 @@ const renderMonthlySpending = (transactions) => {
     return monthlySpent;
   }
 
+  Object.entries(totalsByType)
+    .sort(([, amountA], [, amountB]) => amountB - amountA)
+    .forEach(([type, amount], index) => {
+      const segment = document.createElement("span");
+      segment.className = typeColors[index % typeColors.length];
+      segment.style.flex = `${amount / monthlySpent}`;
+      breakdown.append(segment);
+
+      const item = document.createElement("span");
+      const marker = document.createElement("i");
+      marker.className = typeColors[index % typeColors.length];
+      const name = document.createElement("em");
+      name.textContent = type;
+      const total = document.createElement("b");
+      total.textContent = formatCurrency(amount);
+      item.append(marker, name, total);
+      legend.append(item);
+    });
+
   monthlyTransactions
     .slice()
-    .reverse()
+    .sort(compareByDate)
     .forEach((transaction) => monthlySpendingList.append(createTransactionRow(transaction)));
   return monthlySpent;
 };
@@ -103,9 +162,10 @@ const renderSummary = () => {
     ? `${formatCurrency(monthlySpent)} spent this month.`
     : "No spending recorded this month.";
   balanceInput.value = startingBalance ? startingBalance.toFixed(2) : "";
+  updateTypeFilter(transactions);
+  renderTransactions();
 };
 
-getTransactions().reverse().forEach(renderTransaction);
 renderSummary();
 
 const setModal = (open) => {
@@ -127,10 +187,9 @@ form.addEventListener("submit", (event) => {
   if (!description || !amount) return;
 
   const transactions = getTransactions();
-  const transaction = { description, amount, createdAt: new Date().toISOString() };
+  const transaction = { description, amount, type: typeInput.value, createdAt: new Date().toISOString() };
   transactions.push(transaction);
   saveTransactions(transactions);
-  renderTransaction(transaction);
   renderSummary();
   form.reset();
   setModal(false);
@@ -145,6 +204,9 @@ balanceForm.addEventListener("submit", (event) => {
   renderSummary();
   balanceInput.value = "";
 });
+
+typeFilter.addEventListener("change", renderTransactions);
+transactionSort.addEventListener("change", renderTransactions);
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") setModal(false);
