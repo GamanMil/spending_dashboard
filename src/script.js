@@ -15,6 +15,7 @@ const typeInput = document.querySelector("#type");
 const modalTitle = document.querySelector("#modal-title");
 const modalSubmit = document.querySelector("#modal-submit");
 const deleteMessage = document.querySelector("#delete-message");
+const importFile = document.querySelector("#import-file");
 const storageKey = "northstar-transactions";
 const balanceStorageKey = "northstar-starting-balance";
 const transactionTypes = ["Rent", "Shopping", "Subscription", "Food", "Transport", "Utilities", "Other"];
@@ -39,6 +40,114 @@ const getTransactions = () => {
 
 const saveTransactions = (transactions) => {
   localStorage.setItem(storageKey, JSON.stringify(transactions));
+};
+
+const escapeCsvValue = (value) => {
+  const text = String(value ?? "");
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+};
+
+const parseCsv = (text) => {
+  const rows = [];
+  let row = [];
+  let value = "";
+  let quoted = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+    const nextCharacter = text[index + 1];
+    if (character === '"' && quoted && nextCharacter === '"') {
+      value += '"';
+      index += 1;
+    } else if (character === '"') {
+      quoted = !quoted;
+    } else if (character === "," && !quoted) {
+      row.push(value);
+      value = "";
+    } else if ((character === "\n" || character === "\r") && !quoted) {
+      if (character === "\r" && nextCharacter === "\n") index += 1;
+      row.push(value);
+      if (row.some((cell) => cell.trim())) rows.push(row);
+      row = [];
+      value = "";
+    } else {
+      value += character;
+    }
+  }
+
+  if (value || row.length) {
+    row.push(value);
+    if (row.some((cell) => cell.trim())) rows.push(row);
+  }
+  return rows;
+};
+
+const normalizeHeader = (header) => header.trim().toLowerCase().replace(/[\s_-]+/g, "");
+
+const getColumn = (columns, names) => names.map(normalizeHeader).map((name) => columns.indexOf(name)).find((index) => index >= 0);
+
+const transactionKey = ({ description, amount, createdAt = "" }) => `${description}|${amount}|${createdAt}`;
+
+const importCsv = (text) => {
+  const rows = parseCsv(text);
+  if (rows.length < 2) throw new Error("The CSV file does not contain any transaction rows.");
+
+  const headers = rows[0].map(normalizeHeader);
+  const descriptionColumn = getColumn(headers, ["description", "details", "merchant", "name"]);
+  const amountColumn = getColumn(headers, ["amount", "value", "total"]);
+  const typeColumn = getColumn(headers, ["type", "category"]);
+  const dateColumn = getColumn(headers, ["createdAt", "date", "transactionDate"]);
+
+  if (descriptionColumn === undefined || amountColumn === undefined) {
+    throw new Error("The CSV must include description and amount columns.");
+  }
+
+  const existingTransactions = getTransactions();
+  const existingKeys = new Set(existingTransactions.map(transactionKey));
+  const importedTransactions = [];
+
+  rows.slice(1).forEach((cells) => {
+    const description = (cells[descriptionColumn] || "").trim();
+    const amount = Number((cells[amountColumn] || "").replace(/[^0-9.-]/g, ""));
+    if (!description || !Number.isFinite(amount) || amount <= 0) return;
+
+    const createdAtValue = dateColumn === undefined ? "" : (cells[dateColumn] || "").trim();
+    const parsedDate = createdAtValue ? new Date(createdAtValue) : new Date();
+    const createdAt = Number.isNaN(parsedDate.getTime()) ? new Date().toISOString() : parsedDate.toISOString();
+    const requestedType = typeColumn === undefined ? "Other" : (cells[typeColumn] || "").trim();
+    const type = transactionTypes.includes(requestedType) ? requestedType : "Other";
+    const key = transactionKey({ description, amount, createdAt });
+    if (existingKeys.has(key)) return;
+
+    const transaction = {
+      id: crypto.randomUUID(),
+      description,
+      amount,
+      type,
+      createdAt,
+    };
+    existingKeys.add(key);
+    importedTransactions.push(transaction);
+  });
+
+  if (!importedTransactions.length) throw new Error("No valid, new transactions were found in the CSV file.");
+  saveTransactions([...existingTransactions, ...importedTransactions]);
+  renderSummary();
+  return importedTransactions.length;
+};
+
+const exportCsv = () => {
+  const headers = ["id", "description", "amount", "type", "createdAt"];
+  const rows = getTransactions().map((transaction) =>
+    headers.map((header) => escapeCsvValue(transaction[header])).join(","),
+  );
+  const csv = [headers.join(","), ...rows].join("\r\n");
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `northstar-transactions-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
 };
 
 const getStartingBalance = () => {
@@ -225,6 +334,8 @@ document.addEventListener("click", (event) => {
   const actionElement = event.target.closest("[data-action]");
   const action = actionElement?.dataset.action;
   if (action === "open-modal") setModal(true);
+  if (action === "import-csv") importFile.click();
+  if (action === "export-csv") exportCsv();
   if (action === "close-modal" || event.target === modal) setModal(false);
   if (action === "close-delete-modal" || event.target === deleteModal) setDeleteModal(false);
   if (action === "edit-transaction") {
@@ -243,6 +354,20 @@ document.addEventListener("click", (event) => {
     saveTransactions(transactions.filter(({ id }) => id !== pendingDeleteId));
     renderSummary();
     setDeleteModal(false);
+  }
+});
+
+importFile.addEventListener("change", async () => {
+  const [file] = importFile.files;
+  if (!file) return;
+
+  try {
+    const importedCount = importCsv(await file.text());
+    window.alert(`${importedCount} transaction${importedCount === 1 ? "" : "s"} imported.`);
+  } catch (error) {
+    window.alert(error.message);
+  } finally {
+    importFile.value = "";
   }
 });
 

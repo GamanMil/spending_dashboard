@@ -9,12 +9,13 @@ Northstar is a lightweight personal finance dashboard for tracking spending loca
 - Groups monthly spending by type like rent, shopping, subscriptions, food, transport, utilities and other.
 - Filters transactions by type and sorts them by date, type or amount.
 - Allows transactions to be edited or deleted
+- Imports and exports transactions as CSV files
 - Stores transactions and starting balance in browser `localStorage'
 
 ## Planned features
 
 - I plan to add the ability to host your details on a server so it can be accessed on any device
-- Ability to import bank statments
+- Ability to import bank statements from bank-specific CSV and PDF formats
 - This will always remain something you run locally so there is no risk of data being compromised
 
 ## Run locally
@@ -22,4 +23,3 @@ Northstar is a lightweight personal finance dashboard for tracking spending loca
 ```bash
 npm start
 ```
-

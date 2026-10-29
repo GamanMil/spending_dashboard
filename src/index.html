@@ -13,7 +13,12 @@
     <main class="app">
       <header class="header">
         <a class="logo" href="#">northstar</a>
-        <button class="add-button" type="button" data-action="open-modal">+ Add transaction</button>
+        <div class="header-actions">
+          <input id="import-file" class="sr-only" type="file" accept=".csv,text/csv" />
+          <button class="secondary-button" type="button" data-action="export-csv">Export CSV</button>
+          <button class="secondary-button" type="button" data-action="import-csv">Import CSV</button>
+          <button class="add-button" type="button" data-action="open-modal">+ Add transaction</button>
+        </div>
       </header>
 
       <section class="intro">
