@@ -15,16 +15,16 @@
         <a class="logo" href="#">northstar</a>
         <div class="header-actions">
           <input id="import-file" class="sr-only" type="file" accept=".csv,text/csv" />
-          <button class="secondary-button" type="button" data-action="export-csv">Export CSV</button>
-          <button class="secondary-button" type="button" data-action="import-csv">Import CSV</button>
+          <details class="data-menu">
+            <summary>Data</summary>
+            <div class="data-menu-items">
+              <button type="button" data-action="import-csv">Import CSV</button>
+              <button type="button" data-action="export-csv">Export CSV</button>
+            </div>
+          </details>
           <button class="add-button" type="button" data-action="open-modal">+ Add transaction</button>
         </div>
       </header>
-
-      <section class="intro">
-        <p class="label"></p>
-        <h1>Your money at a glance.</h1>
-      </section>
 
       <section class="balance">
         <p class="label">Current balance</p>

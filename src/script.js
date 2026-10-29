@@ -6,6 +6,7 @@ const balanceForm = document.querySelector("#balance-form");
 const balanceInput = document.querySelector("#balance-input");
 const currentBalance = document.querySelector("#current-balance");
 const balanceChange = document.querySelector("#balance-change");
+const incomeTotal = document.querySelector("#income-total");
 const spentTotal = document.querySelector("#spent-total");
 const monthlySpendingTotal = document.querySelector("#monthly-spending-total");
 const monthlySpendingList = document.querySelector("#monthly-spending-list");
@@ -18,6 +19,7 @@ const deleteMessage = document.querySelector("#delete-message");
 const importFile = document.querySelector("#import-file");
 const storageKey = "northstar-transactions";
 const balanceStorageKey = "northstar-starting-balance";
+const incomeStorageKey = "northstar-income-additions";
 const transactionTypes = ["Rent", "Shopping", "Subscription", "Food", "Transport", "Utilities", "Other"];
 const typeColors = ["purple", "coral", "yellow", "green", "blue", "orange", "slate"];
 
@@ -163,6 +165,21 @@ const saveStartingBalance = (amount) => {
   localStorage.setItem(balanceStorageKey, String(amount));
 };
 
+const getIncomeAdditions = () => {
+  try {
+    const additions = JSON.parse(localStorage.getItem(incomeStorageKey) || "[]");
+    return Array.isArray(additions)
+      ? additions.filter(({ amount, createdAt }) => Number.isFinite(Number(amount)) && Number(amount) > 0 && !Number.isNaN(new Date(createdAt).getTime()))
+      : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveIncomeAdditions = (additions) => {
+  localStorage.setItem(incomeStorageKey, JSON.stringify(additions));
+};
+
 const createTransactionRow = ({ id, description, amount, createdAt, type = "Other" }) => {
   const row = document.createElement("div");
   row.className = "transaction";
@@ -284,11 +301,15 @@ const renderMonthlySpending = (transactions) => {
 
 const renderSummary = () => {
   const transactions = getTransactions();
+  const income = getIncomeAdditions()
+    .filter(({ createdAt }) => isCurrentMonth(createdAt))
+    .reduce((total, { amount }) => total + Number(amount), 0);
   const spent = transactions.reduce((total, transaction) => total + Number(transaction.amount || 0), 0);
   const monthlySpent = renderMonthlySpending(transactions);
   const startingBalance = getStartingBalance();
   const balance = startingBalance - spent;
   currentBalance.textContent = formatCurrency(balance);
+  incomeTotal.textContent = formatCurrency(income);
   spentTotal.textContent = formatCurrency(monthlySpent);
   balanceChange.textContent = monthlySpent
     ? `${formatCurrency(monthlySpent)} spent this month.`
@@ -401,6 +422,9 @@ balanceForm.addEventListener("submit", (event) => {
   if (!Number.isFinite(amount) || amount < 0) return;
 
   addToStartingBalance(amount);
+  const incomeAdditions = getIncomeAdditions();
+  incomeAdditions.push({ amount, createdAt: new Date().toISOString() });
+  saveIncomeAdditions(incomeAdditions);
   renderSummary();
   balanceInput.value = "";
 });
